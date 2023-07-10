@@ -1688,6 +1688,11 @@ struct IMGUI_API ImGuiDockNode
     bool                    WantHiddenTabBarUpdate  :1;
     bool                    WantHiddenTabBarToggle  :1;
 
+    /// OJOIE
+    bool Maximum;
+    ImVec2 PosBeforeMaximum;
+    ImVec2 SizeBeforeMaximum;
+
     ImGuiDockNode(ImGuiID id);
     ~ImGuiDockNode();
     bool                    IsRootNode() const      { return ParentNode == NULL; }
@@ -2604,6 +2609,16 @@ struct IMGUI_API ImGuiWindow
     ImGuiItemStatusFlags    DockTabItemStatusFlags;
     ImRect                  DockTabItemRect;
 
+    /// OJOIE
+    bool DockWillUnDock:1;
+    bool MaximumFocus:1;
+    bool Maximum;
+    bool MaximumRestore;
+    ImVec2 PosBeforeMaximum;
+    ImVec2 SizeBeforeMaximum;
+    ImGuiID DockIdBeforeMaximum;
+    int DockTabOrderBeforeMaximum;
+
 public:
     ImGuiWindow(ImGuiContext* context, const char* name);
     ~ImGuiWindow();
@@ -3433,6 +3448,7 @@ namespace ImGui
 
     // Widgets: Window Decorations
     IMGUI_API bool          CloseButton(ImGuiID id, const ImVec2& pos);
+    IMGUI_API bool          MaximumButton(ImGuiID id, const ImVec2& pos, bool maximum);
     IMGUI_API bool          CollapseButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_node);
     IMGUI_API void          Scrollbar(ImGuiAxis axis);
     IMGUI_API bool          ScrollbarEx(const ImRect& bb, ImGuiID id, ImGuiAxis axis, ImS64* p_scroll_v, ImS64 avail_v, ImS64 contents_v, ImDrawFlags flags);

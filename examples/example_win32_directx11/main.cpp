@@ -25,6 +25,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 // Main code
 int main(int, char**)
 {
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     // Create application window
     //ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr };
@@ -51,6 +52,19 @@ int main(int, char**)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigDockingAlwaysTabBar = false;
+    io.ConfigWindowsResizeFromEdges = true;
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
+    io.ConfigViewportsNoTaskBarIcon = true;
+    io.IniFilename = nullptr; // we manually save the ini file
+
+    //io.BackendRendererName = "OJOIE-D3D11";
+    //io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
+    //io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;
+
     //io.ConfigViewportsNoAutoMerge = true;
     //io.ConfigViewportsNoTaskBarIcon = true;
     //io.ConfigViewportsNoDefaultParent = true;
@@ -178,7 +192,18 @@ int main(int, char**)
             ImGui::RenderPlatformWindowsDefault();
         }
 
-        g_pSwapChain->Present(1, 0); // Present with vsync
+        HRESULT hr = g_pSwapChain->Present(0, 0); // Present with vsync
+
+
+        if (FAILED(hr))
+        {
+            // If the device was removed for any reason, a new device and swap chain will need to be created.
+            exit(-1);
+
+            // Everything is set up now. Do not continue execution of this method. HandleDeviceLost will reenter this method 
+            // and correctly set up the new 
+        }
+
         //g_pSwapChain->Present(0, 0); // Present without vsync
     }
 
@@ -191,6 +216,7 @@ int main(int, char**)
     ::DestroyWindow(hwnd);
     ::UnregisterClassW(wc.lpszClassName, wc.hInstance);
 
+    CoUninitialize();
     return 0;
 }
 
@@ -200,25 +226,28 @@ bool CreateDeviceD3D(HWND hWnd)
     // Setup swap chain
     DXGI_SWAP_CHAIN_DESC sd;
     ZeroMemory(&sd, sizeof(sd));
-    sd.BufferCount = 2;
     sd.BufferDesc.Width = 0;
     sd.BufferDesc.Height = 0;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
+    sd.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    sd.BufferDesc.RefreshRate.Numerator = 0;
     sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+    sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = hWnd;
+    sd.BufferCount = 1;
     sd.SampleDesc.Count = 1;
     sd.SampleDesc.Quality = 0;
+    sd.OutputWindow = hWnd;
     sd.Windowed = TRUE;
     sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
 
     UINT createDeviceFlags = 0;
-    //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
     D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
-    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+    const D3D_FEATURE_LEVEL featureLevelArray[] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_10_1 };
+    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, _countof(featureLevelArray), D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
     if (res == DXGI_ERROR_UNSUPPORTED) // Try high-performance WARP software driver if hardware is not available.
         res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
     if (res != S_OK)

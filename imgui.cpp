@@ -1071,7 +1071,8 @@ static void             RenderDimmedBackgrounds();
 
 // Viewports
 const ImGuiID           IMGUI_VIEWPORT_DEFAULT_ID = 0x11111111; // Using an arbitrary constant instead of e.g. ImHashStr("ViewportDefault", 0); so it's easier to spot in the debugger. The exact value doesn't matter.
-static ImGuiViewportP*  AddUpdateViewport(ImGuiWindow* window, ImGuiID id, const ImVec2& platform_pos, const ImVec2& size, ImGuiViewportFlags flags);
+/// OJOIE
+ImGuiViewportP*  AddUpdateViewport(ImGuiWindow* window, ImGuiID id, const ImVec2& platform_pos, const ImVec2& size, ImGuiViewportFlags flags);
 static void             DestroyViewport(ImGuiViewportP* viewport);
 static void             UpdateViewportsNewFrame();
 static void             UpdateViewportsEndFrame();
@@ -1113,6 +1114,9 @@ static void             UpdateViewportPlatformMonitor(ImGuiViewportP* viewport);
 #ifndef GImGui
 ImGuiContext*   GImGui = NULL;
 #endif
+
+/// OJOIE
+bool gPreviousAutoMerge = false;
 
 // Memory Allocator functions. Use SetAllocatorFunctions() to change them.
 // - You probably don't want to modify that mid-program, and if you use global/static e.g. ImVector<> instances you may need to keep them accessible during program destruction.
@@ -6010,7 +6014,9 @@ static bool ImGui::UpdateWindowManualResize(ImGuiWindow* window, const ImVec2& s
     bool ret_auto_fit = false;
     const int resize_border_count = g.IO.ConfigWindowsResizeFromEdges ? 4 : 0;
     const float grip_draw_size = IM_FLOOR(ImMax(g.FontSize * 1.35f, window->WindowRounding + 1.0f + g.FontSize * 0.2f));
-    const float grip_hover_inner_size = IM_FLOOR(grip_draw_size * 0.75f);
+
+    /// OJOIE 0.75f -> 0.2f
+    const float grip_hover_inner_size = IM_FLOOR(grip_draw_size * 0.2f);
     const float grip_hover_outer_size = g.IO.ConfigWindowsResizeFromEdges ? WINDOWS_HOVER_PADDING : 0.0f;
 
     ImVec2 pos_target(FLT_MAX, FLT_MAX);
@@ -6303,21 +6309,22 @@ void ImGui::RenderWindowDecorations(ImGuiWindow* window, const ImRect& title_bar
             Scrollbar(ImGuiAxis_Y);
 
         // Render resize grips (after their input handling so we don't have a frame of latency)
-        if (handle_borders_and_resize_grips && !(flags & ImGuiWindowFlags_NoResize))
-        {
-            for (int resize_grip_n = 0; resize_grip_n < resize_grip_count; resize_grip_n++)
-            {
-                const ImU32 col = resize_grip_col[resize_grip_n];
-                if ((col & IM_COL32_A_MASK) == 0)
-                    continue;
-                const ImGuiResizeGripDef& grip = resize_grip_def[resize_grip_n];
-                const ImVec2 corner = ImLerp(window->Pos, window->Pos + window->Size, grip.CornerPosN);
-                window->DrawList->PathLineTo(corner + grip.InnerDir * ((resize_grip_n & 1) ? ImVec2(window_border_size, resize_grip_draw_size) : ImVec2(resize_grip_draw_size, window_border_size)));
-                window->DrawList->PathLineTo(corner + grip.InnerDir * ((resize_grip_n & 1) ? ImVec2(resize_grip_draw_size, window_border_size) : ImVec2(window_border_size, resize_grip_draw_size)));
-                window->DrawList->PathArcToFast(ImVec2(corner.x + grip.InnerDir.x * (window_rounding + window_border_size), corner.y + grip.InnerDir.y * (window_rounding + window_border_size)), window_rounding, grip.AngleMin12, grip.AngleMax12);
-                window->DrawList->PathFillConvex(col);
-            }
-        }
+        /// OJOIE not render resize grips
+//        if (handle_borders_and_resize_grips && !(flags & ImGuiWindowFlags_NoResize))
+//        {
+//            for (int resize_grip_n = 0; resize_grip_n < resize_grip_count; resize_grip_n++)
+//            {
+//                const ImU32 col = resize_grip_col[resize_grip_n];
+//                if ((col & IM_COL32_A_MASK) == 0)
+//                    continue;
+//                const ImGuiResizeGripDef& grip = resize_grip_def[resize_grip_n];
+//                const ImVec2 corner = ImLerp(window->Pos, window->Pos + window->Size, grip.CornerPosN);
+//                window->DrawList->PathLineTo(corner + grip.InnerDir * ((resize_grip_n & 1) ? ImVec2(window_border_size, resize_grip_draw_size) : ImVec2(resize_grip_draw_size, window_border_size)));
+//                window->DrawList->PathLineTo(corner + grip.InnerDir * ((resize_grip_n & 1) ? ImVec2(resize_grip_draw_size, window_border_size) : ImVec2(window_border_size, resize_grip_draw_size)));
+//                window->DrawList->PathArcToFast(ImVec2(corner.x + grip.InnerDir.x * (window_rounding + window_border_size), corner.y + grip.InnerDir.y * (window_rounding + window_border_size)), window_rounding, grip.AngleMin12, grip.AngleMax12);
+//                window->DrawList->PathFillConvex(col);
+//            }
+//        }
 
         // Borders (for dock node host they will be rendered over after the tab bar)
         if (handle_borders_and_resize_grips && !window->DockNodeAsHost)
@@ -6346,8 +6353,14 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     // FIXME: Would be nice to generalize the subtleties expressed here into reusable code.
     float pad_l = style.FramePadding.x;
     float pad_r = style.FramePadding.x;
-    float button_sz = g.FontSize;
+
+    /// OJOIE
+    float button_sz = ImMax(2.0f, g.FontSize * 0.5f + 1.0f) * 2.f;
     ImVec2 close_button_pos;
+
+    /// OJOIE
+    ImVec2 maximum_button_pos;
+
     ImVec2 collapse_button_pos;
     if (has_close_button)
     {
@@ -6363,6 +6376,26 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     {
         collapse_button_pos = ImVec2(title_bar_rect.Min.x + pad_l - style.FramePadding.x, title_bar_rect.Min.y);
         pad_l += button_sz;
+    }
+
+    /// OJOIE
+    pad_r += button_sz;
+    maximum_button_pos = ImVec2(title_bar_rect.Max.x - pad_r - style.FramePadding.x, title_bar_rect.Min.y);
+
+    /// maximum button
+    if (MaximumButton(window->GetID("#MAXIMUM"), maximum_button_pos, window->Maximum)) {
+        window->Maximum = !window->Maximum;
+        if (window->Maximum) {
+            window->PosBeforeMaximum = window->Pos;
+            window->SizeBeforeMaximum = window->Size;
+            window->MaximumFocus = false;
+            if (window->Viewport != GetMainViewport()) {
+                SetWindowPos(window, { 0, 0 });
+                SetWindowSize(window, GetViewportPlatformMonitor(window->Viewport)->WorkSize);
+            }
+        } else {
+            window->MaximumRestore = true;
+        }
     }
 
     // Collapse button (submitting first so it gets priority when choosing a navigation init fallback)
@@ -6398,7 +6431,9 @@ void ImGui::RenderWindowTitleBarContents(ImGuiWindow* window, const ImRect& titl
     }
 
     ImRect layout_r(title_bar_rect.Min.x + pad_l, title_bar_rect.Min.y, title_bar_rect.Max.x - pad_r, title_bar_rect.Max.y);
-    ImRect clip_r(layout_r.Min.x, layout_r.Min.y, ImMin(layout_r.Max.x + g.Style.ItemInnerSpacing.x, title_bar_rect.Max.x), layout_r.Max.y);
+
+    /// OJOIE no spacing ImMin(layout_r.Max.x + g.Style.ItemInnerSpacing.x, title_bar_rect.Max.x)
+    ImRect clip_r(layout_r.Min.x, layout_r.Min.y, layout_r.Max.x, layout_r.Max.y);
     if (flags & ImGuiWindowFlags_UnsavedDocument)
     {
         ImVec2 marker_pos;
@@ -6494,6 +6529,44 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
     if (window_just_created)
         window = CreateNewWindow(name, flags);
 
+    /// OJOIE
+    if (window->Maximum) {
+        flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking;
+        if (window->Viewport == GetMainViewport()) {
+            SetWindowPos(window, window->Viewport->Pos);
+            SetWindowSize(window, window->Viewport->Size);
+//            FocusWindow(window);
+//        } else {
+//            FocusWindow(window);
+            if (!window->MaximumFocus) {
+                BringWindowToDisplayFront(window);
+                FocusWindow(window);
+                window->MaximumFocus = true;
+            }
+
+        } else {
+
+            if (!window->MaximumFocus && !window->DockNode) {
+                //g.PlatformIO.Platform_SetWindowFocus(window->Viewport);
+                window->MaximumFocus = true;
+            }
+
+            /// force top
+            g.PlatformIO.Platform_SetWindowTop(window->Viewport);
+            FocusWindow(window);
+        }
+    }
+
+    if (window->MaximumRestore) {
+        SetNextWindowPos(window->PosBeforeMaximum);
+        SetNextWindowSize(window->SizeBeforeMaximum);
+        if (window->DockIdBeforeMaximum) {
+            window->DockOrder = window->DockTabOrderBeforeMaximum;
+            SetWindowDock(window, window->DockIdBeforeMaximum, 0);
+            window->DockIdBeforeMaximum = 0;
+        }
+    }
+
     // Automatically disable manual moving/resizing when NoInputs is set
     if ((flags & ImGuiWindowFlags_NoInputs) == ImGuiWindowFlags_NoInputs)
         flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
@@ -6568,6 +6641,12 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         }
     }
 
+    /// OJOIE
+    if (window->MaximumRestore) {
+        window->MaximumRestore = false;
+    }
+
+
     // Parent window is latched only on the first call to Begin() of the frame, so further append-calls can be done from a different window stack
     ImGuiWindow* parent_window_in_stack = (window->DockIsActive && window->DockNode->HostWindow) ? window->DockNode->HostWindow : g.CurrentWindowStack.empty() ? NULL : g.CurrentWindowStack.back().Window;
     ImGuiWindow* parent_window = first_begin_of_the_frame ? ((flags & (ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_Popup)) ? parent_window_in_stack : NULL) : window->ParentWindow;
@@ -6627,14 +6706,19 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         }
         else
         {
-            SetWindowPos(window, g.NextWindowData.PosVal, g.NextWindowData.PosCond);
+            /// OJOIE
+            if (window->DockNode == nullptr || !window->DockWillUnDock) {
+                SetWindowPos(window, g.NextWindowData.PosVal, g.NextWindowData.PosCond);
+            }
         }
     }
     if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasSize)
     {
         window_size_x_set_by_api = (window->SetWindowSizeAllowFlags & g.NextWindowData.SizeCond) != 0 && (g.NextWindowData.SizeVal.x > 0.0f);
         window_size_y_set_by_api = (window->SetWindowSizeAllowFlags & g.NextWindowData.SizeCond) != 0 && (g.NextWindowData.SizeVal.y > 0.0f);
-        SetWindowSize(window, g.NextWindowData.SizeVal, g.NextWindowData.SizeCond);
+        if (window->DockNode == nullptr || !window->DockWillUnDock) {
+            SetWindowSize(window, g.NextWindowData.SizeVal, g.NextWindowData.SizeCond);
+        }
     }
     if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasScroll)
     {
@@ -6893,7 +6977,9 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         {
             if (!window->ViewportOwned && viewport_rect.GetWidth() > 0 && viewport_rect.GetHeight() > 0.0f)
             {
-                ClampWindowPos(window, visibility_rect);
+                if (!window->Maximum) {  /// OJOIE
+                    ClampWindowPos(window, visibility_rect);
+                }
             }
             else if (window->ViewportOwned && g.PlatformIO.Monitors.Size > 0)
             {
@@ -6945,7 +7031,9 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         // Handle manual resize: Resize Grips, Borders, Gamepad
         int border_held = -1;
         ImU32 resize_grip_col[4] = {};
-        const int resize_grip_count = g.IO.ConfigWindowsResizeFromEdges ? 2 : 1; // Allow resize from lower-left if we have the mouse cursor feedback for it.
+
+        /// OJOIE CHANGE change 2 to 4
+        const int resize_grip_count = g.IO.ConfigWindowsResizeFromEdges ? 4 : 1; // Allow resize from lower-left if we have the mouse cursor feedback for it.
         const float resize_grip_draw_size = IM_FLOOR(ImMax(g.FontSize * 1.10f, window->WindowRounding + 1.0f + g.FontSize * 0.2f));
         if (handle_borders_and_resize_grips && !window->Collapsed)
             if (UpdateWindowManualResize(window, size_auto_fit, &border_held, resize_grip_count, &resize_grip_col[0], visibility_rect))
@@ -14005,8 +14093,10 @@ static void ImGui::UpdateViewportsNewFrame()
                     FocusWindow(focused_viewport->Window, focus_request_flags);
                 else if (focused_viewport->LastFocusedHadNavWindow)
                     FocusTopMostWindowUnderOne(NULL, NULL, focused_viewport, focus_request_flags); // Focus top most in viewport
-                else
-                    FocusWindow(NULL, focus_request_flags); // No window had focus last time viewport was focused
+
+                /// OJOIE comment out below will keep focus when merging into viewport
+//                else
+//                    FocusWindow(NULL, focus_request_flags); // No window had focus last time viewport was focused
             }
         }
         if (focused_viewport)
@@ -14193,8 +14283,9 @@ ImGuiViewportP* ImGui::AddUpdateViewport(ImGuiWindow* window, ImGuiID id, const 
     flags |= ImGuiViewportFlags_IsPlatformWindow;
     if (window != NULL)
     {
+        /// OJOIE
         if (g.MovingWindow && g.MovingWindow->RootWindowDockTree == window)
-            flags |= ImGuiViewportFlags_NoInputs | ImGuiViewportFlags_NoFocusOnAppearing;
+            flags |= ImGuiViewportFlags_NoInputs/* | ImGuiViewportFlags_NoFocusOnAppearing*/;
         if ((window->Flags & ImGuiWindowFlags_NoMouseInputs) && (window->Flags & ImGuiWindowFlags_NoNavInputs))
             flags |= ImGuiViewportFlags_NoInputs;
         if (window->Flags & ImGuiWindowFlags_NoFocusOnAppearing)
@@ -14388,7 +14479,8 @@ static void ImGui::WindowSelectViewport(ImGuiWindow* window)
             else if (!UpdateTryMergeWindowIntoHostViewports(window)) // Merge?
             {
                 // New viewport
-                window->Viewport = AddUpdateViewport(window, window->ID, window->Pos, window->Size, ImGuiViewportFlags_NoFocusOnAppearing);
+                /// OJOIE ImGuiViewportFlags_NoFocusOnAppearing -> 0
+                window->Viewport = AddUpdateViewport(window, window->ID, window->Pos, window->Size, 0);
             }
         }
         else if (window->ViewportAllowPlatformMonitorExtend < 0 && (flags & ImGuiWindowFlags_ChildWindow) == 0)
@@ -15322,6 +15414,9 @@ void ImGui::DockContextQueueUndockWindow(ImGuiContext* ctx, ImGuiWindow* window)
     req.Type = ImGuiDockRequestType_Undock;
     req.UndockTargetWindow = window;
     ctx->DockContext.Requests.push_back(req);
+
+    /// OJOIE
+    window->DockWillUnDock = true;
 }
 
 void ImGui::DockContextQueueUndockNode(ImGuiContext* ctx, ImGuiDockNode* node)
@@ -15402,7 +15497,9 @@ void ImGui::DockContextProcessDock(ImGuiContext* ctx, ImGuiDockRequest* req)
         new_node->HostWindow = node->HostWindow;
         node = new_node;
     }
-    node->SetLocalFlags(node->LocalFlags & ~ImGuiDockNodeFlags_HiddenTabBar);
+
+    /// OJOIE CHANGE: always no show tabbar button ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton
+    node->SetLocalFlags(node->LocalFlags & ~ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton);
 
     if (node != payload_node)
     {
@@ -15512,8 +15609,10 @@ void ImGui::DockContextProcessUndockWindow(ImGuiContext* ctx, ImGuiWindow* windo
     window->Collapsed = false;
     window->DockIsActive = false;
     window->DockNodeIsVisible = window->DockTabIsVisible = false;
-    window->Size = window->SizeFull = FixLargeWindowsWhenUndocking(window->SizeFull, window->Viewport);
 
+    /// OJOIE
+//    window->Size = window->SizeFull = FixLargeWindowsWhenUndocking(window->SizeFull, window->Viewport);
+    window->DockWillUnDock = false;
     MarkIniSettingsDirty();
 }
 
@@ -15630,6 +15729,8 @@ ImGuiDockNode::ImGuiDockNode(ImGuiID id)
     IsFocused = HasCloseButton = HasWindowMenuButton = HasCentralNodeChild = false;
     IsBgDrawnThisFrame = false;
     WantCloseAll = WantLockSizeOnce = WantMouseMove = WantHiddenTabBarUpdate = WantHiddenTabBarToggle = false;
+
+    Maximum = false;
 }
 
 ImGuiDockNode::~ImGuiDockNode()
@@ -15701,9 +15802,26 @@ static void ImGui::DockNodeAddWindow(ImGuiDockNode* node, ImGuiWindow* window, b
 
             // Add existing windows
             for (int n = 0; n < node->Windows.Size - 1; n++)
-                TabBarAddTab(node->TabBar, ImGuiTabItemFlags_None, node->Windows[n]);
+                /// OJOIE None -> Unsorted
+                if (window->MaximumRestore) {
+                    TabBarAddTab(node->TabBar, ImGuiTabItemFlags_Unsorted, node->Windows[n]);
+                } else {
+                    TabBarAddTab(node->TabBar, ImGuiTabItemFlags_None, node->Windows[n]);
+                }
         }
         TabBarAddTab(node->TabBar, ImGuiTabItemFlags_Unsorted, window);
+
+        /// OJOIE
+        if (window->MaximumRestore) {
+            int orderOffset = window->DockOrder - node->TabBar->Tabs.Size + 1;
+            ImGuiTabItem *tabItem = TabBarFindTabByID(node->TabBar, window->TabId);
+            if (orderOffset != 0) {
+                TabBarQueueReorder(node->TabBar, tabItem, orderOffset);
+            }
+            TabBarQueueFocus(node->TabBar, tabItem);
+//            GImGui->NavWindowingTarget = window; // tweak it to display top most
+            g.IO.ConfigViewportsNoAutoMerge = gPreviousAutoMerge;
+        }
     }
 
     DockNodeUpdateVisibleFlag(node);
@@ -16152,7 +16270,10 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
     const ImGuiDockNodeFlags node_flags = node->MergedFlags;
 
     // Decide if the node will have a close button and a window menu button
-    node->HasWindowMenuButton = (node->Windows.Size > 0) && (node_flags & ImGuiDockNodeFlags_NoWindowMenuButton) == 0;
+//    node->HasWindowMenuButton = (node->Windows.Size > 0) && (node_flags & ImGuiDockNodeFlags_NoWindowMenuButton) == 0;
+    /// OJOIE
+    node->HasWindowMenuButton = false;
+
     node->HasCloseButton = false;
     for (int window_n = 0; window_n < node->Windows.Size; window_n++)
     {
@@ -16209,6 +16330,13 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
             window_flags |= ImGuiWindowFlags_NoFocusOnAppearing;
             window_flags |= ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoCollapse;
             window_flags |= ImGuiWindowFlags_NoTitleBar;
+//
+//            /// OJOIE
+//            if (node->Maximum) {
+//                window_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+//                SetNextWindowPos(ref_window->Viewport->Pos);
+//                SetNextWindowSize(ref_window->Viewport->Size);
+//            }
 
             SetNextWindowBgAlpha(0.0f); // Don't set ImGuiWindowFlags_NoBackground because it disables borders
             PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -17771,6 +17899,8 @@ ImGuiID ImGui::DockBuilderAddNode(ImGuiID id, ImGuiDockNodeFlags flags)
     {
         DockSpace(id, ImVec2(0, 0), (flags & ~ImGuiDockNodeFlags_DockSpace) | ImGuiDockNodeFlags_KeepAliveOnly);
         node = DockContextFindNodeByID(ctx, id);
+        /// OJOIE CHANGE
+        node->SetLocalFlags(ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton);
     }
     else
     {
@@ -18193,7 +18323,9 @@ void ImGui::BeginDocked(ImGuiWindow* window, bool* p_open)
         bool want_undock = false;
         want_undock |= (window->Flags & ImGuiWindowFlags_NoDocking) != 0;
         want_undock |= (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_HasPos) && (window->SetWindowPosAllowFlags & g.NextWindowData.PosCond) && g.NextWindowData.PosUndock;
-        if (want_undock)
+
+        /// OJOIE
+        if (want_undock && !window->MaximumRestore)
         {
             DockContextProcessUndockWindow(ctx, window);
             return;

@@ -84,6 +84,15 @@ Index of this file:
 #pragma GCC diagnostic ignored "-Wdeprecated-enum-enum-conversion"  // warning: bitwise operation between different enumeration types ('XXXFlags_' and 'XXXFlagsPrivate_') is deprecated
 #endif
 
+/// OJOIE
+
+namespace ImGui {
+
+ImGuiViewportP* AddUpdateViewport(ImGuiWindow* window, ImGuiID id, const ImVec2& pos, const ImVec2& size, ImGuiViewportFlags flags);
+
+}
+
+
 //-------------------------------------------------------------------------
 // Data
 //-------------------------------------------------------------------------
@@ -804,6 +813,69 @@ bool ImGui::ArrowButton(const char* str_id, ImGuiDir dir)
     return ArrowButtonEx(str_id, dir, ImVec2(sz, sz), ImGuiButtonFlags_None);
 }
 
+bool ImGui::MaximumButton(ImGuiID id, const ImVec2& pos, bool maximum) {
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+
+    // Tweak 1: Shrink hit-testing area if button covers an abnormally large proportion of the visible region. That's in order to facilitate moving the window away. (#3825)
+    // This may better be applied as a general hit-rect reduction mechanism for all widgets to ensure the area to move window is always accessible?
+    const ImRect bb(pos, pos + ImVec2(g.FontSize, g.FontSize) + g.Style.FramePadding * 2.0f);
+    ImRect bb_interact = bb;
+    const float area_to_visible_ratio = window->OuterRectClipped.GetArea() / bb.GetArea();
+    if (area_to_visible_ratio < 1.5f)
+        bb_interact.Expand(ImFloor(bb_interact.GetSize() * -0.25f));
+
+    // Tweak 2: We intentionally allow interaction when clipped so that a mechanical Alt,Right,Activate sequence can always close a window.
+    // (this isn't the regular behavior of buttons, but it doesn't affect the user much because navigation tends to keep items visible).
+    bool is_clipped = !ItemAdd(bb_interact, id);
+
+    bool hovered, held;
+    bool pressed = ButtonBehavior(bb_interact, id, &hovered, &held);
+    if (is_clipped)
+        return pressed;
+
+    // Render
+    // FIXME: Clarify this mess
+    ImU32 col = GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
+    ImVec2 center = bb.GetCenter();
+
+    /// OJOIE CHANGE: I don't want the circle background, instead I want rect
+    if (hovered) {
+        ImRect buttonRect{ bb.Min.x + 3.f, bb.Min.y + 3.f,
+                           bb.Max.x - 3.f, bb.Max.y - 3.f  };
+        float radius = ImMax(2.0f, g.FontSize * 0.5f + 1.0f);
+        window->DrawList->AddRectFilled(center + ImVec2(radius, radius), center + ImVec2(-radius, -radius), col);
+    }
+
+//    if (hovered)
+//        window->DrawList->AddCircleFilled(center, ImMax(2.0f, g.FontSize * 0.5f + 1.0f), col);
+
+    float cross_extent = g.FontSize * 0.5f * 0.7071f - 1.0f;
+    ImU32 cross_col = GetColorU32(ImGuiCol_Text);
+    center -= ImVec2(0.5f, 0.5f);
+
+    if (maximum) {
+        cross_extent *= 0.7;
+        center += ImVec2(1.5f, -1.5f);
+        window->DrawList->AddRect(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), cross_col, 0.0f, 0, 1.5f);
+        center += ImVec2(-3.f, 3.f);
+        ImU32 bg = hovered ? col : GetColorU32(ImGuiCol_TitleBgActive);
+        window->DrawList->AddRectFilled(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), bg);
+        window->DrawList->AddRect(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), cross_col);
+    } else {
+//        window->DrawList->AddRect(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), cross_col);
+        window->DrawList->AddLine(center + ImVec2(-cross_extent - 0.5f, -cross_extent + 1.5f), center + ImVec2(cross_extent + 0.5f, -cross_extent + 1.5f), cross_col, 4.0f);
+        window->DrawList->AddLine(center + ImVec2(-cross_extent, -cross_extent - 0.5f), center + ImVec2(-cross_extent, cross_extent + 0.5f), cross_col, 1.0f);
+        window->DrawList->AddLine(center + ImVec2(-cross_extent - 0.5f, cross_extent), center + ImVec2(cross_extent + 0.5f, cross_extent), cross_col, 1.0f);
+        window->DrawList->AddLine(center + ImVec2(cross_extent, cross_extent + 0.5f), center + ImVec2(cross_extent, -cross_extent - 0.5f), cross_col, 1.0f);
+    }
+
+//    window->DrawList->AddLine(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), cross_col, 1.0f);
+//    window->DrawList->AddLine(center + ImVec2(+cross_extent, -cross_extent), center + ImVec2(-cross_extent, +cross_extent), cross_col, 1.0f);
+
+    return pressed;
+}
+
 // Button to close a window
 bool ImGui::CloseButton(ImGuiID id, const ImVec2& pos)
 {
@@ -831,14 +903,21 @@ bool ImGui::CloseButton(ImGuiID id, const ImVec2& pos)
     // FIXME: Clarify this mess
     ImU32 col = GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
     ImVec2 center = bb.GetCenter();
-    if (hovered)
-        window->DrawList->AddCircleFilled(center, ImMax(2.0f, g.FontSize * 0.5f + 1.0f), col);
+
+    /// OJOIE CHANGE: I don't want the circle background, instead I want rect
+    if (hovered) {
+        float radius = ImMax(2.0f, g.FontSize * 0.5f + 1.0f);
+        window->DrawList->AddRectFilled(center + ImVec2(radius, radius), center + ImVec2(-radius, -radius), col);
+    }
+
+//    if (hovered)
+//        window->DrawList->AddCircleFilled(center, ImMax(2.0f, g.FontSize * 0.5f + 1.0f), col);
 
     float cross_extent = g.FontSize * 0.5f * 0.7071f - 1.0f;
     ImU32 cross_col = GetColorU32(ImGuiCol_Text);
     center -= ImVec2(0.5f, 0.5f);
-    window->DrawList->AddLine(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), cross_col, 1.0f);
-    window->DrawList->AddLine(center + ImVec2(+cross_extent, -cross_extent), center + ImVec2(-cross_extent, +cross_extent), cross_col, 1.0f);
+    window->DrawList->AddLine(center + ImVec2(+cross_extent, +cross_extent), center + ImVec2(-cross_extent, -cross_extent), cross_col, 2.0f); /// OJOIE
+    window->DrawList->AddLine(center + ImVec2(+cross_extent, -cross_extent), center + ImVec2(-cross_extent, +cross_extent), cross_col, 2.0f);
 
     return pressed;
 }
@@ -858,8 +937,15 @@ bool ImGui::CollapseButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_no
     //bool is_dock_menu = (window->DockNodeAsHost && !window->Collapsed);
     ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
     ImU32 text_col = GetColorU32(ImGuiCol_Text);
-    if (hovered || held)
-        window->DrawList->AddCircleFilled(bb.GetCenter() + ImVec2(0,-0.5f), g.FontSize * 0.5f + 1.0f, bg_col);
+
+    /// OJOIE CHANGE: change to Rect instead of circle
+    if (hovered || held) {
+        ImRect buttonRect{ bb.Min.x + 3.f, bb.Min.y + 3.f, bb.Max.x - 3.f, bb.Max.y - 3.f };
+        window->DrawList->AddRectFilled(buttonRect.Min, buttonRect.Max, bg_col);
+    }
+
+//    if (hovered || held)
+//        window->DrawList->AddCircleFilled(bb.GetCenter() + ImVec2(0,-0.5f), g.FontSize * 0.5f + 1.0f, bg_col);
 
     if (dock_node)
         RenderArrowDockMenu(window->DrawList, bb.Min + g.Style.FramePadding, g.FontSize, text_col);
@@ -8329,6 +8415,8 @@ bool    ImGui::TabItemButton(const char* label, ImGuiTabItemFlags flags)
     return TabItemEx(tab_bar, label, NULL, flags | ImGuiTabItemFlags_Button | ImGuiTabItemFlags_NoReorder, NULL);
 }
 
+extern bool gPreviousAutoMerge;
+
 bool    ImGui::TabItemEx(ImGuiTabBar* tab_bar, const char* label, bool* p_open, ImGuiTabItemFlags flags, ImGuiWindow* docked_window)
 {
     // Layout whole tab bar if not already done
@@ -8358,6 +8446,11 @@ bool    ImGui::TabItemEx(ImGuiTabBar* tab_bar, const char* label, bool* p_open, 
     IM_ASSERT(!p_open || !(flags & ImGuiTabItemFlags_Button));
     IM_ASSERT((flags & (ImGuiTabItemFlags_Leading | ImGuiTabItemFlags_Trailing)) != (ImGuiTabItemFlags_Leading | ImGuiTabItemFlags_Trailing)); // Can't use both Leading and Trailing
 
+    // OJOIE CHANGE : we don't show the close button, instead we show a context menu
+    bool closeable = p_open != nullptr;
+    bool *an_p_open = p_open;
+    p_open = nullptr;
+
     // Store into ImGuiTabItemFlags_NoCloseButton, also honor ImGuiTabItemFlags_NoCloseButton passed by user (although not documented)
     if (flags & ImGuiTabItemFlags_NoCloseButton)
         p_open = NULL;
@@ -8386,8 +8479,20 @@ bool    ImGui::TabItemEx(ImGuiTabBar* tab_bar, const char* label, bool* p_open, 
     tab->ContentWidth = size.x;
     tab->BeginOrder = tab_bar->TabsActiveCount++;
 
+    /// OJOIE CHANGE :
+    ImGuiID tabContextMenuID = GetIDWithSeed("#CONTEXTMENU", NULL, docked_window ? docked_window->ID : id);
+    ImGuiWindowFlags tabContextMenuFlags = ImGuiWindowFlags_AlwaysAutoResize |
+                                           ImGuiWindowFlags_NoTitleBar |
+                                           ImGuiWindowFlags_NoSavedSettings;
+
     const bool tab_bar_appearing = (tab_bar->PrevFrameVisible + 1 < g.FrameCount);
-    const bool tab_bar_focused = (tab_bar->Flags & ImGuiTabBarFlags_IsFocused) != 0;
+    bool tab_bar_focused = (tab_bar->Flags & ImGuiTabBarFlags_IsFocused) != 0;
+    bool treat_as_hover = false;
+    if (IsPopupOpen(tabContextMenuID, tabContextMenuFlags)) {
+        tab_bar_focused = true;
+        treat_as_hover = true;
+    }
+
     const bool tab_appearing = (tab->LastFrameVisible + 1 < g.FrameCount);
     const bool tab_just_unsaved = (flags & ImGuiTabItemFlags_UnsavedDocument) && !(tab->Flags & ImGuiTabItemFlags_UnsavedDocument);
     const bool is_tab_button = (flags & ImGuiTabItemFlags_Button) != 0;
@@ -8564,16 +8669,18 @@ bool    ImGui::TabItemEx(ImGuiTabBar* tab_bar, const char* label, bool* p_open, 
     }
 #endif
 
+    /// OJOIE CHANGE :
     // Render tab shape
     ImDrawList* display_draw_list = window->DrawList;
-    const ImU32 tab_col = GetColorU32((held || hovered) ? ImGuiCol_TabHovered : tab_contents_visible ? (tab_bar_focused ? ImGuiCol_TabActive : ImGuiCol_TabUnfocusedActive) : (tab_bar_focused ? ImGuiCol_Tab : ImGuiCol_TabUnfocused));
+    const ImU32 tab_col = GetColorU32((held || hovered || treat_as_hover) ? ImGuiCol_TabHovered : tab_contents_visible ? (tab_bar_focused ? ImGuiCol_TabActive : ImGuiCol_TabUnfocusedActive) : (tab_bar_focused ? ImGuiCol_Tab : ImGuiCol_TabUnfocused));
     TabItemBackground(display_draw_list, bb, flags, tab_col);
     RenderNavHighlight(bb, id);
 
+    /// OJOIE CHANGE: commet out below, we don't focus on right mouse click
     // Select with right mouse button. This is so the common idiom for context menu automatically highlight the current widget.
-    const bool hovered_unblocked = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
-    if (hovered_unblocked && (IsMouseClicked(1) || IsMouseReleased(1)) && !is_tab_button)
-        TabBarQueueFocus(tab_bar, tab);
+//    const bool hovered_unblocked = IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+//    if (hovered_unblocked && (IsMouseClicked(1) || IsMouseReleased(1)) && !is_tab_button)
+//        TabBarQueueFocus(tab_bar, tab);
 
     if (tab_bar->Flags & ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)
         flags |= ImGuiTabItemFlags_NoCloseWithMiddleMouseButton;
@@ -8608,6 +8715,72 @@ bool    ImGui::TabItemEx(ImGuiTabBar* tab_bar, const char* label, bool* p_open, 
         if (!(tab_bar->Flags & ImGuiTabBarFlags_NoTooltip) && !(tab->Flags & ImGuiTabItemFlags_NoTooltip))
             if (IsItemHovered(ImGuiHoveredFlags_DelayNormal))
                 SetTooltip("%.*s", (int)(FindRenderedTextEnd(label) - label), label);
+
+    /// OJOIE CHANGE :
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && ImGui::IsItemHovered()) {
+        ImGui::OpenPopupEx(tabContextMenuID);
+        if (docked_window) {
+            tab_bar->NextSelectedTabId = 0;
+        }
+    }
+
+    if (ImGui::BeginPopupEx(tabContextMenuID, tabContextMenuFlags)) {
+        if (ImGui::MenuItem("Maximum", nullptr, &docked_window->Maximum)) {
+            if (docked_window) {
+                /// OJOIE
+                DockContextQueueUndockWindow(&g, docked_window);
+//                DockContextProcessUndockWindow(&g, docked_window);
+//                g.DockContext.WantFullRebuild = true;
+                docked_window->PosBeforeMaximum = docked_window->Pos;
+                docked_window->SizeBeforeMaximum = docked_window->Size;
+
+//                docked_window->Pos = docked_window->Viewport->Pos;
+//                docked_window->SizeFull = docked_window->Size = docked_window->Viewport->Size;
+                docked_window->DockIdBeforeMaximum = node->ID;
+                docked_window->DockTabOrderBeforeMaximum = docked_window->DockOrder;
+
+                /// make window stick the real window
+                gPreviousAutoMerge = g.IO.ConfigViewportsNoAutoMerge;
+
+                if (docked_window->Viewport != GetMainViewport()) {
+                    SetWindowPos(docked_window, { 0, 0 });
+                    SetWindowSize(docked_window, GetViewportPlatformMonitor(docked_window->Viewport)->WorkSize);
+                } else {
+                    SetWindowPos(docked_window, docked_window->Viewport->Pos);
+                    SetWindowSize(docked_window, docked_window->Viewport->Size);
+
+                    g.IO.ConfigViewportsNoAutoMerge = false;
+                }
+
+                docked_window->MaximumFocus = false;
+
+//                g.NavWindowingTarget = docked_window;
+
+
+//                if (node->Maximum) {
+//
+//                    node->PosBeforeMaximum = node->Pos;
+//                    node->SizeBeforeMaximum = node->Size;
+//                    node->Pos = docked_window->Viewport->Pos;
+//                    node->Size = docked_window->Viewport->Size;
+//                    node->HostWindow->Pos = node->Pos;
+//                    node->HostWindow->Size = node->HostWindow->SizeFull = node->Size;
+//
+//                } else {
+//                    node->Pos = node->PosBeforeMaximum;
+//                    node->Size = node->SizeBeforeMaximum;
+//                    node->HostWindow->Pos = node->Pos;
+//                    node->HostWindow->Size = node->HostWindow->SizeFull = node->Size;
+//                }
+            }
+        }
+        if (closeable && ImGui::MenuItem("Close Tab")) {
+            *an_p_open = false;
+            TabBarCloseTab(tab_bar, tab);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     IM_ASSERT(!is_tab_button || !(tab_bar->SelectedTabId == tab->ID && is_tab_button)); // TabItemButton should not be selected
     if (is_tab_button)

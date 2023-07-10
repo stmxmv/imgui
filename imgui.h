@@ -3207,6 +3207,8 @@ struct ImGuiPlatformIO
     // Platform functions are typically called before their Renderer counterpart, apart from Destroy which are called the other way.
 
     // Platform function --------------------------------------------------- Called by -----
+    /// OJOIE
+    void    (*Platform_SetWindowTop)(ImGuiViewport* vp);
     void    (*Platform_CreateWindow)(ImGuiViewport* vp);                    // . . U . .  // Create a new platform window for the given viewport
     void    (*Platform_DestroyWindow)(ImGuiViewport* vp);                   // N . U . D  //
     void    (*Platform_ShowWindow)(ImGuiViewport* vp);                      // . . U . .  // Newly created windows are initially hidden so SetWindowPos/Size/Title can be called on them before showing the window
@@ -3232,6 +3234,9 @@ struct ImGuiPlatformIO
     void    (*Renderer_SetWindowSize)(ImGuiViewport* vp, ImVec2 size);      // . . U . .  // Resize swap chain, frame buffers etc. (called after Platform_SetWindowSize)
     void    (*Renderer_RenderWindow)(ImGuiViewport* vp, void* render_arg);  // . . . R .  // (Optional) Clear framebuffer, setup render target, then render the viewport->DrawData. 'render_arg' is the value passed to RenderPlatformWindowsDefault().
     void    (*Renderer_SwapBuffers)(ImGuiViewport* vp, void* render_arg);   // . . . R .  // (Optional) Call Present/SwapBuffers. 'render_arg' is the value passed to RenderPlatformWindowsDefault().
+
+    /// OJOIE
+    void    (*Renderer_Tick)();
 
     // (Optional) Monitor list
     // - Updated by: app/backend. Update every frame to dynamically support changing monitor or DPI configuration.

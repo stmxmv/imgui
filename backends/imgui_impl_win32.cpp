@@ -961,7 +961,8 @@ struct ImGui_ImplWin32_ViewportData
 static void ImGui_ImplWin32_GetWin32StyleFromViewportFlags(ImGuiViewportFlags flags, DWORD* out_style, DWORD* out_ex_style)
 {
     if (flags & ImGuiViewportFlags_NoDecoration)
-        *out_style = WS_POPUP;
+        /// OJOIE
+        *out_style = WS_POPUP | WS_CLIPCHILDREN | WS_BORDER;
     else
         *out_style = WS_OVERLAPPEDWINDOW;
 
@@ -1103,6 +1104,14 @@ static void ImGui_ImplWin32_SetWindowFocus(ImGuiViewport* viewport)
     ::SetFocus(vd->Hwnd);
 }
 
+/// OJOIE
+static void ImGui_ImplWin32_SetWindowTop(ImGuiViewport* viewport)
+{
+    ImGui_ImplWin32_ViewportData* vd = (ImGui_ImplWin32_ViewportData*)viewport->PlatformUserData;
+    IM_ASSERT(vd->Hwnd != 0);
+    ::BringWindowToTop(vd->Hwnd);
+}
+
 static bool ImGui_ImplWin32_GetWindowFocus(ImGuiViewport* viewport)
 {
     ImGui_ImplWin32_ViewportData* vd = (ImGui_ImplWin32_ViewportData*)viewport->PlatformUserData;
@@ -1179,6 +1188,9 @@ static LRESULT CALLBACK ImGui_ImplWin32_WndProcHandler_PlatformWindow(HWND hWnd,
     {
         switch (msg)
         {
+        case WM_ERASEBKGND:
+            // do not erase background
+            return 1;
         case WM_CLOSE:
             viewport->PlatformRequestClose = true;
             return 0;
@@ -1242,6 +1254,9 @@ static void ImGui_ImplWin32_InitPlatformInterface(bool platform_has_own_dc)
     platform_io.Platform_UpdateWindow = ImGui_ImplWin32_UpdateWindow;
     platform_io.Platform_GetWindowDpiScale = ImGui_ImplWin32_GetWindowDpiScale; // FIXME-DPI
     platform_io.Platform_OnChangedViewport = ImGui_ImplWin32_OnChangedViewport; // FIXME-DPI
+
+    /// OJOIE
+    platform_io.Platform_SetWindowTop = ImGui_ImplWin32_SetWindowTop;
 
     // Register main window handle (which is owned by the main application, not by us)
     // This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.
